@@ -1,3 +1,4 @@
+
 package com.example.demo.security;
 
 import com.example.demo.entity.User;
@@ -9,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
 
@@ -16,6 +18,7 @@ import java.util.UUID;
 public class JwtService {
 
     private final SecretKey signingKey;
+
     private final long accessTokenExpiration;
     private final long refreshTokenExpiration;
 
@@ -26,17 +29,25 @@ public class JwtService {
     ) {
         byte[] keyBytes = Decoders.BASE64.decode(secret);
 
-        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+        this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
     public String generateAccessToken(User user) {
-        return generateToken(user, "access", accessTokenExpiration);
+        return generateToken(
+                user,
+                "access",
+                accessTokenExpiration
+        );
     }
 
     public String generateRefreshToken(User user) {
-        return generateToken(user, "refresh", refreshTokenExpiration);
+        return generateToken(
+                user,
+                "refresh",
+                refreshTokenExpiration
+        );
     }
 
     private String generateToken(
@@ -44,8 +55,7 @@ public class JwtService {
             String tokenType,
             long expiration
     ) {
-        Date now = new Date();
-        Date expiresAt = new Date(now.getTime() + expiration);
+        Instant now = Instant.now();
 
         return Jwts.builder()
                 .subject(user.getUsername())
@@ -53,36 +63,34 @@ public class JwtService {
                 .claim("role", user.getSystemRole().name())
                 .claim("type", tokenType)
                 .id(UUID.randomUUID().toString())
-                .issuedAt(now)
-                .expiration(expiresAt)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusMillis(expiration)))
                 .signWith(signingKey)
                 .compact();
     }
 
-    public boolean isAccessTokenValid(String token, User user) {
-        try {
-            Claims claims = extractAllClaims(token);
+    public String extractUsername(String token) {
+        return extractAllClaims(token).getSubject();
+    }
 
-            return claims.getSubject().equals(user.getUsername()) && "access".equals(claims.get("type", String.class)) && claims.getExpiration().after(new Date());
-        } catch (Exception exception) {
-            return false;
-        }
+    public Long extractUserId(String token) {
+        return extractAllClaims(token).get("userId", Long.class);
+    }
+
+    public boolean isAccessTokenValid(String token, User user) {
+        Claims claims = extractAllClaims(token);
+
+        return claims.getSubject().equals(user.getUsername())
+                && claims.get("userId", Long.class).equals(user.getId())
+                && "access".equals(claims.get("type", String.class));
     }
 
     public boolean isRefreshTokenValid(String token, User user) {
-        try {
-            Claims claims = extractAllClaims(token);
+        Claims claims = extractAllClaims(token);
 
-            return claims.getSubject().equals(user.getUsername())
-                    && "refresh".equals(claims.get("type", String.class))
-                    && claims.getExpiration().after(new Date());
-        } catch (Exception exception) {
-            return false;
-        }
-    }
-
-    public String extractUsername(String token) {
-        return extractAllClaims(token).getSubject();
+        return claims.getSubject().equals(user.getUsername())
+                && claims.get("userId", Long.class).equals(user.getId())
+                && "refresh".equals(claims.get("type", String.class));
     }
 
     private Claims extractAllClaims(String token) {
@@ -91,5 +99,13 @@ public class JwtService {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    public long getAccessTokenExpiration() {
+        return accessTokenExpiration;
+    }
+
+    public long getRefreshTokenExpiration() {
+        return refreshTokenExpiration;
     }
 }
