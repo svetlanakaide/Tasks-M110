@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mts_tasks
+    username: admin
+    password: the-best-project
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+jwt:
+  secret: ${JWT_SECRET:26joMqqcMgRsT5DZkUcaNoIf74NcdKOFWpOiy6GYje9fMd0wbzbFoSXV5WD6RToS}
+  access-token-expiration: 900000
+  refresh-token-expiration: 604800000
+server:
+  error:
+    include-message: always
+    include-binding-errors: always
+logging:
+  level:
+    org.springframework.security: TRACE
+    org.springframework.web: TRACE
+    org.springframework.web.servlet.mvc.method.annotation: TRACE
+    org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolver: TRACE
+    org.springframework.http.converter: TRACE
